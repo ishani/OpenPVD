@@ -261,6 +261,7 @@ project "OpenPVD"
         Src(),
 
         ExternalSrc() .. "CLI11/",
+        ExternalSrc() .. "unordered_dense/include/",
 
         ExternalSrc() .. "PhysX/pxshared/include/",
         ExternalSrc() .. "PhysX/physx/include",
