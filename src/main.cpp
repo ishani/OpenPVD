@@ -21,10 +21,26 @@ struct ResolvedStreamNamespacedName
     std::string mName;
 };
 
+struct PxProperty
+{
+    std::string m_name;
+
+};
+
+struct PxClass
+{
+    std::string m_name;
+
+};
+
 struct PxDatabase
 {
-    const std::string m_invalidString = "<invalid>";
-    std::unordered_map< uint32_t, std::string > m_stringTable;
+    using PxStringTable = ankerl::unordered_dense::map< uint32_t, std::string >;
+
+    bool m_verboseDataLog = false;
+
+    PxStringTable m_stringTable;                        // table of handles:string build as events are parsed
+    const std::string m_invalidString = "<invalid>";    // return value for any unresolved string table lookups
 
 
     inline const std::string& lookupStringByHandle( const uint32_t handle ) const
@@ -50,163 +66,296 @@ struct PxDatabase
         };
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::StringHandleEvent& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::StringHandleEvent& _event )
     {
         m_stringTable.emplace( _event.mHandle, _event.mString );
-        flog.info( "[{}] <= \"{}\"", _event.mHandle, _event.mString );
+
+        if ( m_verboseDataLog )
+        {
+            elog.info( "[{}]           <= \"{}\"", _event.mHandle, _event.mString );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::CreateClass& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::CreateClass& _event )
     {
         const auto nsName       = lookupNamespace( _event.mName );
-        flog.info( "mName   : [{}.{}]", nsName.mNamespace, nsName.mName );
+
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mName           : [{}.{}]", nsName.mNamespace, nsName.mName );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::DeriveClass& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::DeriveClass& _event )
     {
         const auto nsParent     = lookupNamespace( _event.mParent );
         const auto nsChild      = lookupNamespace( _event.mChild );
-        flog.info( "mParent : [{}.{}]", nsParent.mNamespace, nsParent.mName );
-        flog.info( "mChild  : [{}.{}]", nsChild.mNamespace, nsChild.mName );
+
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mParent         : [{}.{}]", nsParent.mNamespace, nsParent.mName );
+            elog.info( "mChild          : [{}.{}]", nsChild.mNamespace, nsChild.mName );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::CreateProperty& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::CreateProperty& _event )
     {
         const auto propClass    = lookupNamespace( _event.mClass );
         const auto propName     = lookupStringByHandle( _event.mName );
-        const auto propSemantic = lookupStringByHandle( _event.mSemantic );
+        const auto propSemantic = ( _event.mSemantic == 0 ) ? "n/a" : lookupStringByHandle( _event.mSemantic );
         const auto propDatatype = lookupNamespace( _event.mDatatypeName );
 
-        flog.info( "mClass  : [{}.{}]", propClass.mNamespace, propClass.mName );
-        flog.info( "mName   : {}", propName );
-
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mClass          : [{}.{}]", propClass.mNamespace, propClass.mName );
+            elog.info( "mName           : {}", propName );
+            elog.info( "mSemantic       : {}", propSemantic );
+            elog.info( "mDatatypeName   : [{}.{}]", propDatatype.mNamespace, propDatatype.mName );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::CreatePropertyMessage& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::CreatePropertyMessage& _event )
     {
         const auto propClass = lookupNamespace( _event.mClass );
         const auto propMsg = lookupNamespace( _event.mMessageName );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mClass          : [{}.{}]", propClass.mNamespace, propClass.mName );
+            elog.info( "mMessageName    : [{}.{}]", propMsg.mNamespace, propMsg.mName );
+            elog.info( "mMessageByteSz  : {}", _event.mMessageByteSize );
+        }
+
+        const auto messageCount = _event.mMessageEntries.size();
+        for ( uint32_t idx = 0; idx < messageCount; ++idx )
+        {
+            const auto& dtype( const_cast<const physx::pvdsdk::StreamPropMessageArg&>(_event.mMessageEntries[idx]) );
+
+            const auto msgDatatype = lookupNamespace( dtype.mDatatypeName );
+            const auto msgName = lookupStringByHandle( dtype.mPropertyName );
+
+            if ( m_verboseDataLog )
+            {
+                elog.info( " {:>2} -> [{}.{}] {}", idx, msgDatatype.mNamespace, msgDatatype.mName, msgName );
+                elog.info( "       {} bytes, {} offset", idx, dtype.mByteSize, dtype.mMessageOffset );
+            }
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::CreateInstance& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::CreateInstance& _event )
     {
         const auto instClass = lookupNamespace( _event.mClass );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mClass          : [{}.{}]", instClass.mNamespace, instClass.mName );
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SetPropertyValue& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SetPropertyValue& _event )
     {
         const auto propName = lookupStringByHandle( _event.mPropertyName );
         const auto propTypeName = lookupNamespace( _event.mIncomingTypeName );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mPropertyName   : {}", propName );
+            elog.info( "mIncTypeName    : [{}.{}]", propTypeName.mNamespace, propTypeName.mName );
+            elog.info( "mNumItems       : {}", _event.mNumItems );
+            elog.info( "mData.size()    : {}", _event.mData.size() );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::BeginSetPropertyValue& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::BeginSetPropertyValue& _event )
+    {
+        const auto propName = lookupStringByHandle( _event.mPropertyName );
+        const auto propTypeName = lookupNamespace( _event.mIncomingTypeName );
+
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mPropertyName   : {}", propName );
+            elog.info( "mIncTypeName    : [{}.{}]", propTypeName.mNamespace, propTypeName.mName );
+        }
+    }
+
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::AppendPropertyValueData& _event )
+    {
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mData.size()    : {}", _event.mData.size() );
+        }
+    }
+
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::EndSetPropertyValue& _event )
     {
 
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::AppendPropertyValueData& _event )
-    {
-
-    }
-
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::EndSetPropertyValue& _event )
-    {
-
-    }
-
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SetPropertyMessage& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SetPropertyMessage& _event )
     {
         const auto nsMessage = lookupNamespace( _event.mMessageName );
-        flog.info( "mMsgName  : [{}.{}]", nsMessage.mNamespace, nsMessage.mName );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mMsgName        : [{}.{}]", nsMessage.mNamespace, nsMessage.mName );
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mData.size()    : {}", _event.mData.size() );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::BeginPropertyMessageGroup& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::BeginPropertyMessageGroup& _event )
+    {
+        const auto nsMessage = lookupNamespace( _event.mMsgName );
+
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mMsgName        : [{}.{}]", nsMessage.mNamespace, nsMessage.mName );
+        }
+    }
+
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SendPropertyMessageFromGroup& _event )
+    {
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstance       : {:#x}", _event.mInstance );
+            elog.info( "mData.size()    : {}", _event.mData.size() );
+        }
+    }
+
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::EndPropertyMessageGroup& _event )
     {
 
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SendPropertyMessageFromGroup& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::DestroyInstance& _event )
     {
-
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::EndPropertyMessageGroup& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::PushBackObjectRef& _event )
     {
+        const auto propName = lookupStringByHandle( _event.mProperty );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mPropertyName   : {}", propName );
+            elog.info( "mObjectRef      : {:#x}", _event.mObjectRef );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::DestroyInstance& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::RemoveObjectRef& _event )
     {
+        const auto propName = lookupStringByHandle( _event.mProperty );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mPropertyName   : {}", propName );
+            elog.info( "mObjectRef      : {:#x}", _event.mObjectRef );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::PushBackObjectRef& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::BeginSection& _event )
     {
+        const auto sectionName = lookupStringByHandle( _event.mName );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mSectionId      : {}", _event.mSectionId );
+            elog.info( "mName           : {}", sectionName );
+            elog.info( "mTimestamp      : {}", _event.mTimestamp );
+            elog.info( "{:-^120}", "\\/" );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::RemoveObjectRef& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::EndSection& _event )
     {
+        const auto sectionName = lookupStringByHandle( _event.mName );
 
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mSectionId      : {}", _event.mSectionId );
+            elog.info( "mName           : {}", sectionName );
+            elog.info( "mTimestamp      : {}", _event.mTimestamp );
+            elog.info( "{:-^120}", "/\\" );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::BeginSection& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SetPickable& _event )
     {
-
+        if ( m_verboseDataLog )
+            elog.info( "** TODO **" );
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::EndSection& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SetColor& _event )
     {
-
+        if ( m_verboseDataLog )
+            elog.info( "** TODO **" );
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SetPickable& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SetIsTopLevel& _event )
     {
-
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mIsTopLevel     : {}", _event.mIsTopLevel );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SetColor& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::SetCamera& _event )
     {
-
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mName           : {}", _event.mName );
+            elog.info( "mPosition       : {{ {}, {}, {} }}", _event.mPosition.x, _event.mPosition.y, _event.mPosition.z );
+            elog.info( "mUp             : {{ {}, {}, {} }}", _event.mUp.x, _event.mUp.y, _event.mUp.z );
+            elog.info( "mTarget         : {{ {}, {}, {} }}", _event.mTarget.x, _event.mTarget.y, _event.mTarget.z );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SetIsTopLevel& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::AddProfileZone& _event )
     {
-
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mName           : {}", _event.mName );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::SetCamera& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::AddProfileZoneEvent& _event )
     {
-
+        if ( m_verboseDataLog )
+        {
+            elog.info( "mInstanceId     : {:#x}", _event.mInstanceId );
+            elog.info( "mName           : {}", _event.mName );
+            elog.info( "mEventId        : {}", _event.mEventId );
+            elog.info( "mCompileTime    : {}", _event.mCompileTimeEnabled );
+        }
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::AddProfileZone& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::StreamEndEvent& _event )
     {
-
+        if ( m_verboseDataLog )
+            elog.info( "** TODO **" );
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::AddProfileZoneEvent& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::ErrorMessage& _event )
     {
-
+        if ( m_verboseDataLog )
+            elog.info( "** TODO **" );
     }
 
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::StreamEndEvent& _event )
+    void handleEvent( spdlog::logger& elog, const physx::pvdsdk::EventGroup& _group,  const physx::pvdsdk::OriginShift& _event )
     {
-
-    }
-
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::ErrorMessage& _event )
-    {
-
-    }
-
-    void handleEvent( spdlog::logger& flog, const physx::pvdsdk::OriginShift& _event )
-    {
-
+        if ( m_verboseDataLog )
+            elog.info( "** TODO **" );
     }
 };
 
@@ -257,11 +406,18 @@ int main( int argc, char** argv )
 
     auto pxdLogFile = fs::path( cmdline::PxDFilename ).replace_extension( ".stream.log" );
     auto streamLogger = spdlog::basic_logger_mt( "stream_logger", pxdLogFile.string(), true );
+    PxDb.m_verboseDataLog = true;
+
+
+    uint64_t lastTimestamp = 0;
 
     for ( ;; )
     {
         EventGroup eg;
         eg.serialize( eventUnpacker );
+
+        const uint64_t relativeTimestamp = eg.mTimestamp - lastTimestamp;
+        lastTimestamp = eg.mTimestamp;
 
         if ( eg.mNumEvents == 0 )
             break;
@@ -278,9 +434,9 @@ int main( int argc, char** argv )
                 x _ev;                                                                  \
                 _ev.serialize( eventUnpacker );                                         \
                 streamLogger->set_pattern( "%v" );                                      \
-                streamLogger->info("\n"#x);                                             \
-                streamLogger->set_pattern( "    %v" );                                  \
-                PxDb.handleEvent(*streamLogger, _ev);                                   \
+                streamLogger->info("\n{:>16} | "#x, relativeTimestamp);                 \
+                streamLogger->set_pattern( "                      %v" );                \
+                PxDb.handleEvent(*streamLogger, eg, _ev);                               \
                 } break;
 
 #define DECLARE_PVD_COMM_STREAM_EVENT_NO_COMMA(x)   DECLARE_PVD_COMM_STREAM_EVENT(x)

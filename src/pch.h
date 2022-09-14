@@ -41,6 +41,9 @@ namespace fs = std::filesystem;
 // CLI11
 #include "CLI11.hpp"
 
+// github.com/martinus/unordered_dense
+#include "ankerl/unordered_dense.h"
+
 // spdlog
 #include <spdlog/common.h>
 #include <spdlog/spdlog.h>
