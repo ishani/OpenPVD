@@ -1,0 +1,6 @@
+[submodule "externals/PhysX"]
+	path = externals/PhysX
+	url = https://github.com/NVIDIAGameWorks/PhysX
+[submodule "externals/spdlog"]
+	path = externals/spdlog
+	url = https://github.com/gabime/spdlog.git
