@@ -2,6 +2,24 @@
 
 #include <windows.h>
 
+#ifdef OPVD_PCH_GLFW
+
+// GLFW
+#include <glad/gl.h>
+#define GLFW_INCLUDE_NONE
+#include "GLFW/glfw3.h"
+#include "GLFW/glfw3ext.h"
+
+#if OURO_PLATFORM_WIN
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include "GLFW/glfw3native.h"
+
+#pragma pop_macro("APIENTRY")
+#endif // OURO_PLATFORM_WIN
+
+#endif // OPVD_PCH_GLFW
+
+
 #include <algorithm>
 #include <array>
 #include <atomic>

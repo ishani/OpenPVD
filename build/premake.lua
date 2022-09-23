@@ -1,4 +1,4 @@
-ModuleRefInclude = {}
+DefaultLibraryInc = {}
 
 -- ==============================================================================
 
@@ -17,6 +17,16 @@ function ExternalSrc()
     return initialDir .. "/../externals/"
 end
 
+
+function GetMacOSPackgesDir()
+    return "/opt/homebrew/opt/"
+end
+function GetPrebuiltLibs_MacUniversal()
+    return initialDir .. "/../libs/macos/universal-fat/"
+end
+function GetPrebuiltLibs_Win64()
+    return initialDir .. "/../libs/windows/win64/"
+end
 
 -- ------------------------------------------------------------------------------
 function GetBuildRootToken()
@@ -75,8 +85,11 @@ function SetDefaultBuildConfiguration()
     cppdialect "C++17"
 
     warnings "High"
+    disablewarnings { "4100" }   -- unreferenced formal param
 
     SilenceMSVCSecurityWarnings()
+
+    flags { "MultiProcessorCompile" }
 
     filter "configurations:Debug"
         defines   { "DEBUG" }
@@ -110,7 +123,6 @@ function SetDefaultAppConfiguration()
             "WIN32_LEAN_AND_MEAN",
             "NOMINMAX",
             "NODRAWTEXT",
-            "NOGDI",
             "NOBITMAP",
             "NOMCX",
             "NOSERVICE",
@@ -166,9 +178,9 @@ workspace ("OpenPVD")
 group "libs"
 
 -- slim build of core PVD and physx foundation source to let us use their types
-project "px"
+project "pxpvd"
 
-    filename "%{_ACTION or ''}_lib_px"
+    filename "%{_ACTION or ''}_lib_pxpvd"
 
     kind "StaticLib"
     language "C++"
@@ -199,7 +211,7 @@ project "px"
 
 -- ==============================================================================
 
-ModuleRefInclude["spdlog"] = function()
+DefaultLibraryInc["spdlog"] = function()
     defines
     {
         "SPDLOG_COMPILED_LIB"
@@ -221,7 +233,7 @@ project "spdlog"
     SetDefaultBuildConfiguration()
     SetDefaultOutputDirectories()
 
-    ModuleRefInclude["spdlog"]()
+    DefaultLibraryInc["spdlog"]()
 
     files
     {
@@ -231,11 +243,18 @@ project "spdlog"
 
 -- ==============================================================================
 
+include "premake-glfw.lua"
+include "premake-imgui.lua"
+
+
+-- ==============================================================================
+
 group "app"
 
-project "OpenPVD"
+function ConfigureApp( appName )
 
-    filename "%{_ACTION or ''}_openpvd"
+    filename ( "%{_ACTION or ''}_app_" .. appName )
+    targetname ( "opvd-" .. appName )
 
     SetDefaultBuildConfiguration()
     SetDefaultAppConfiguration()
@@ -244,15 +263,14 @@ project "OpenPVD"
     AddCommonAppLink()
 
     debugdir "$(SolutionDir)../../"
-    disablewarnings { "4100" }
 
-    for libName, libFn in pairs(ModuleRefInclude) do
+    for libName, libFn in pairs(DefaultLibraryInc) do
         libFn()
     end
 
     links 
     {
-        "px",
+        "pxpvd",
         "spdlog",
     }
 
@@ -274,8 +292,11 @@ project "OpenPVD"
 
     files 
     {
-        Src() .. "**.cpp",
-        Src() .. "**.h",
+        Src() .. "common/*.*",
+
+        Src() .. "app." .. appName .. ".cpp",
+        Src() .. "pch.cpp",
+        Src() .. "pch.h",
     }
 
     -- enable a pch
@@ -283,4 +304,41 @@ project "OpenPVD"
         "../src/pch.cpp",
         Src(),
         "pch.h" )
+
+end
+
+-- ==============================================================================
+
+project "capture"
+
+    ConfigureApp("capture")
+
+-- ==============================================================================
+
+project "filter"
+
+    ConfigureApp("filter")
+
+-- ==============================================================================
+
+project "viewer"
+
+    ConfigureApp("viewer")
+
+    IncludeGLFW();
+    IncludeIMGUI();
+
+    links
+    {
+        "glfw",
+        "imgui"
+    }
+
+    includedirs
+    {
+    }
+    files
+    {
+    }
+
 
