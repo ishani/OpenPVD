@@ -27,7 +27,7 @@ namespace cmdline
         Network
     };
 
-    static std::string PxDInput     = "testdata/mm.pxd2";
+    static std::string PxDInput     = "testdata/basic.pxd2";
     static std::string PxDOutput    = "testdata/filtered.pxd2";
     static std::string PxDAddress   = "127.0.0.1";
     static uint16_t PvPort          = 5425;
@@ -43,11 +43,13 @@ namespace cmdline
         app.add_option( "-p,--pxd", PxDInput, "path to a PXD2 capture file to parse" )->check( CLI::ExistingFile );
         app.add_option( "--meshlimit", TriMeshLimit, "limit of trimesh instances to allow")->check( CLI::PositiveNumber );
 
+        // optional output mode selection
         CLI::App* outToFile = app.add_subcommand( "to_file", "" );
         CLI::App* outToNet  = app.add_subcommand( "to_net", "" );
-        app.require_subcommand(-1);
+        app.require_subcommand(-1); // require 1 subcommand at most
 
         outToFile->add_option( "-o,--out", PxDOutput, "where to write a filtered PXD2 output" );
+
         outToNet->add_option( "-o,--out", PxDAddress, "address to connect to" );
         outToNet->add_option( "-p,--port", PvPort, "port to connect to" );
 
@@ -135,14 +137,14 @@ int main( int argc, char** argv )
         init.serialize( eventUnpacker );
 
         // check the id/version is what we expect
-        if ( init.mStreamId != StreamInitialization::getStreamId() )
+        if ( init.mStreamId != physx::pvdsdk::StreamInitialization::getStreamId() )
         {
-            spdlog::error( "stream ID invalid; got {}, expected {}", init.mStreamId, StreamInitialization::getStreamId() );
+            spdlog::error( "stream ID invalid; got {}, expected {}", init.mStreamId, physx::pvdsdk::StreamInitialization::getStreamId() );
             exit( 1 );
         }
-        if ( init.mStreamVersion != StreamInitialization::getStreamVersion() )
+        if ( init.mStreamVersion != physx::pvdsdk::StreamInitialization::getStreamVersion() )
         {
-            spdlog::error( "stream version invalid; got {}, expected {}", init.mStreamVersion, StreamInitialization::getStreamVersion() );
+            spdlog::error( "stream version invalid; got {}, expected {}", init.mStreamVersion, physx::pvdsdk::StreamInitialization::getStreamVersion() );
             exit( 1 );
         }
 
@@ -163,9 +165,12 @@ int main( int argc, char** argv )
         // setup any filtering required
         Op::FilterState opFilterState;
         if ( cmdline::TriMeshLimit >= 0 )
+        {
+            spdlog::info( "Limiting [PxTriangleMesh] instances to {}", cmdline::TriMeshLimit );
             opFilterState.m_instanceLimits["PxTriangleMesh"] = cmdline::TriMeshLimit;
+        }
 
-
+        uint32_t numEventsProcessed = 0;
         physx::pvdsdk::EventStreamifier<physx::PxPvdTransport> streamOut( outboundTransport->lock() );
         for ( ;; )
         {
@@ -177,7 +182,7 @@ int main( int argc, char** argv )
                 break;
 
             // for each event in the group (which is usually 1), decode and pass over to the event breaker logic
-            for ( auto eventIndex = 0U; eventIndex < eg.mNumEvents; eventIndex++ )
+            for ( auto eventIndex = 0U; eventIndex < eg.mNumEvents; eventIndex++, numEventsProcessed++ )
             {
                 Op::PvdEventType eventType;
                 eventUnpacker.read( eventType );
@@ -210,8 +215,14 @@ int main( int argc, char** argv )
                     break;
                 }
             }
+
+            if ( numEventsProcessed % 5000 == 0 )
+            {
+                spdlog::info( " ... {:>8} events", numEventsProcessed );
+            }
         }
         
+        spdlog::info( "- - - - - - - - - - - - - - - -" );
         eventBreaker.logSummary();
 
         outboundTransport->unlock();
