@@ -1,6 +1,6 @@
 # Sinful Prebuilt Binary Collection
 
-OUROVEON uses a small mountain of external libraries. Many of these we build from source (some of which contain edits from the original) or are header-only.
+This project uses a small mountain of external libraries. Many of these we build from source (some of which contain edits from the original) or are header-only.
 
 This folder contains all the libraries we distribute as pre-built binaries for one reason or another.
 
@@ -14,12 +14,7 @@ A handful are either too complex to bother porting into our build framework and/
 
 Pre-built support libraries :
 
-* OpenSSL 1.1.1m (dynamic, x64, Visual Studio 2019 16.11) using https://github.com/kiyolee/openssl1_1-win-build
 * Freetype 2.11.1 (static, x64, Visual Studio 2019 16.11) built from original source https://www.freetype.org/
-
-Middleware :
-
-* [Superluminal performance](https://superluminal.eu/) analysis API
 
 <br>
 <hr>
@@ -33,8 +28,4 @@ We build our own fat libraries by using both the M1-native and rosetta-hosted ve
 
 At time of writing, we ship the following custom-fat libraries
 
-* OpenSSL 1.1.1
-* FLAC
-* OPUS
-* Sodium
 * Freetype (req. PNG, BZ2)
