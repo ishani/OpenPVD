@@ -1,40 +1,42 @@
 
 
 -- ==============================================================================
-function IncludeFreetype()
+
+Library.Include.freetype = function()
 
     filter "system:Windows"
-    externalincludedirs
-    {
-        GetPrebuiltLibs_Win64() .. "freetype/include/",
-    }
+        externalincludedirs
+        {
+            Paths.PrebuiltLibs.windows .. "freetype/include/",
+        }
     filter {}
 
     filter "system:linux"
-    externalincludedirs
-    {
-        "/usr/include/freetype2/",
-    }
+        externalincludedirs
+        {
+            "/usr/include/freetype2/",
+        }
     filter {}
 
     filter "system:macosx"
-    externalincludedirs
-    {
-        GetMacOSPackgesDir() .. "freetype/include/freetype2/",
-    }
+        externalincludedirs
+        {
+            Paths.MacOSPackages .. "freetype/include/freetype2/",
+        }
     filter {}
+
 end
 
 -- ==============================================================================
-function LinkFreetype()
+Library.Link.freetype  = function()
 
     -- windows has debug/release static builds
     filter "system:Windows"
         links ( "freetype.lib" )
         filter { "system:Windows", "configurations:Release" }
-            libdirs ( GetPrebuiltLibs_Win64() .. "freetype/lib/release_static" )
+            libdirs ( Paths.PrebuiltLibs.windows .. "freetype/lib/release_static" )
         filter { "system:Windows", "configurations:Debug" }
-            libdirs ( GetPrebuiltLibs_Win64() .. "freetype/lib/debug_static" )
+            libdirs ( Paths.PrebuiltLibs.windows .. "freetype/lib/debug_static" )
     filter {}
 
     -- 
@@ -44,7 +46,7 @@ function LinkFreetype()
 
     -- 
     filter "system:macosx"
-        libdirs ( GetPrebuiltLibs_MacUniversal() )
+        libdirs ( Paths.PrebuiltLibs.macosx )
         links
         {
             "freetype",
@@ -52,39 +54,34 @@ function LinkFreetype()
             "bz2",
         }
     filter {}
+    
 end
 
 
-function Root_IMGUI()
-    return ExternalSrc() .. "imgui/"
-end
+Paths.Libs.imgui = Paths.ExternalSrc .. "imgui/"
 
 -- ==============================================================================
-function IncludeIMGUI()
+Library.Include.imgui = function()
+
+    Library.Include.freetype()
 
     includedirs
     {
-        Root_IMGUI() .. "/",
-        Root_IMGUI() .. "/backends/",
-        Root_IMGUI() .. "/misc/freetype/",
-        Root_IMGUI() .. "/misc/cpp/",
+        Paths.Libs.imgui .. "/",
+        Paths.Libs.imgui .. "/backends/",
+        Paths.Libs.imgui .. "/misc/freetype/",
+        Paths.Libs.imgui .. "/misc/cpp/",
     }
-    IncludeFreetype()
+
 end
 
 -- ==============================================================================
 project "imgui"
 
-    kind "StaticLib"
-    language "C++"
+    ConfigureLibrary( "imgui", "C++" )
 
-    filename "%{_ACTION or ''}_lib_imgui"
-
-    SetDefaultBuildConfiguration()
-    SetDefaultOutputDirectories()
-
-    IncludeGLFW()
-    IncludeIMGUI()
+    Library.Include.glfw()
+    Library.Include.imgui()
 
     defines 
     {
@@ -92,12 +89,12 @@ project "imgui"
     }
     files
     {
-        Root_IMGUI() .. "/*.cpp",
-        Root_IMGUI() .. "/*.h",
-        Root_IMGUI() .. "/freetype/*.cpp",
-        Root_IMGUI() .. "/freetype/*.h",
-        Root_IMGUI() .. "/backends/imgui_impl_glfw.*",
-        Root_IMGUI() .. "/backends/imgui_impl_opengl3.*",
+        Paths.Libs.imgui .. "/*.cpp",
+        Paths.Libs.imgui .. "/*.h",
+        Paths.Libs.imgui .. "/freetype/*.cpp",
+        Paths.Libs.imgui .. "/freetype/*.h",
+        Paths.Libs.imgui .. "/backends/imgui_impl_glfw.*",
+        Paths.Libs.imgui .. "/backends/imgui_impl_opengl3.*",
 
-        Root_IMGUI() .. "/misc/cpp/*.*",
+        Paths.Libs.imgui .. "/misc/cpp/*.*",
     }

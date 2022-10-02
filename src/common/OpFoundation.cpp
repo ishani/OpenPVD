@@ -10,7 +10,7 @@
 //
 
 #include "pch.h"
-#include "common/OpFoundation.h"
+#include "OpFoundation.h"
 
 #include "PxPhysicsVersion.h"
 #include "foundation/PxErrorCallback.h"

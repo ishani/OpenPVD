@@ -1,20 +1,14 @@
 
-function Root_GLFW()
-    return ExternalSrc() .. "glfw/"
-end
-function Root_GLFW_EXT()
-    return ExternalSrc() .. "glfw_ext/"
-end
+Paths.Libs.glfw     = Paths.ExternalSrc .. "glfw/"
+Paths.Libs.glfw_ext = Paths.ExternalSrc .. "glfw_ext/"
+
 -- ------------------------------------------------------------------------------
-function IncludeGLFW()
+Library.Include.glfw = function()
+
     externalincludedirs
     {
-        Root_GLFW() .. "include",
-        Root_GLFW_EXT() .. "include",
-    }
-    externalincludedirs
-    {
-        ExternalSrc() .. "glad",
+        Paths.Libs.glfw .. "include",
+        Paths.Libs.glfw_ext .. "include",
     }
 
     defines 
@@ -23,48 +17,42 @@ function IncludeGLFW()
     }
 
     filter "system:Windows"
-    defines 
-    {
-        "_GLFW_WIN32",
-        "_GLFW_USE_HYBRID_HPG",
-    }
+        defines 
+        {
+            "_GLFW_WIN32",
+            "_GLFW_USE_HYBRID_HPG",
+        }
     filter {}
 
     filter "system:linux"
-    defines 
-    {
-        "_GLFW_X11"
-    }
+        defines 
+        {
+            "_GLFW_X11"
+        }
     filter {}
 
     filter "system:macosx"
-    defines 
-    {
-        "_GLFW_COCOA"
-    }
+        defines 
+        {
+            "_GLFW_COCOA"
+        }
     filter {}
+
 end
 
 -- ==============================================================================
 
 project "glfw"
 
-    kind "StaticLib"
-    language "C"
+    ConfigureLibrary( "glfw", "C++" )
 
-    filename "%{_ACTION or ''}_lib_glfw"
-
-    SetDefaultBuildConfiguration()
-    SetDefaultOutputDirectories()
-
-    IncludeGLFW()
+    Library.Include.glfw()
 
     files 
     {
-        Root_GLFW() .. "include/*.h",
+        Paths.Libs.glfw .. "include/*.h",
 
-        ExternalSrc() .. "glad/glad_gl.c",
-        Root_GLFW_EXT() .. "**.*",
+        Paths.Libs.glfw_ext .. "**.*",
     }
 
     local common_headers = {
@@ -153,36 +141,36 @@ project "glfw"
     }
 
     for k,v in pairs(common_headers) do 
-        files       { Root_GLFW() .. v }
+        files       { Paths.Libs.glfw .. v }
     end
     for k,v in pairs(common_sources) do 
-        files       { Root_GLFW() .. v }
+        files       { Paths.Libs.glfw .. v }
     end
 
     filter "system:Windows"
-    for k,v in pairs(windows_headers) do 
-        files       { Root_GLFW() .. v }
-    end
-    for k,v in pairs(windows_sources) do 
-        files       { Root_GLFW() .. v }
-    end
+        for k,v in pairs(windows_headers) do 
+            files       { Paths.Libs.glfw .. v }
+        end
+        for k,v in pairs(windows_sources) do 
+            files       { Paths.Libs.glfw .. v }
+        end
     filter {}
 
     filter "system:linux"
-    for k,v in pairs(linux_headers) do 
-        files       { Root_GLFW() .. v }
-    end
-    for k,v in pairs(linux_sources) do 
-        files       { Root_GLFW() .. v }
-    end
+        for k,v in pairs(linux_headers) do 
+            files       { Paths.Libs.glfw .. v }
+        end
+        for k,v in pairs(linux_sources) do 
+            files       { Paths.Libs.glfw .. v }
+        end
     filter {}
 
     filter "system:macosx"
-    for k,v in pairs(osx_headers) do 
-        files       { Root_GLFW() .. v }
-    end
-    for k,v in pairs(osx_sources) do 
-        files       { Root_GLFW() .. v }
-    end
+        for k,v in pairs(osx_headers) do 
+            files       { Paths.Libs.glfw .. v }
+        end
+        for k,v in pairs(osx_sources) do 
+            files       { Paths.Libs.glfw .. v }
+        end
     filter {}
 
